@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cipher Tool - Mod 26</title>
+  <style>
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    * { box-sizing: border-box; }
+    
+    body {
+      margin: 0; min-height: 100vh; background: #020817; display: flex; align-items: center; 
+      justify-content: center; font-family: 'Courier New', monospace; padding: 24px 16px;
+    }
+    
+    textarea, input { transition: border-color 0.2s; }
+    button:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+    button:disabled { cursor: not-allowed !important; }
+
+    /* Nút chọn Mode (Caesar / Vigenere) */
+    .mode-btn {
+      flex: 1; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer;
+      font-family: inherit; font-weight: 700; font-size: 13px; letter-spacing: 1px; transition: all 0.2s;
+      background: rgba(30,41,59,0.8); color: #64748b;
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; box-shadow: 0 4px 20px rgba(14,165,233,0.3);
+    }
+
+    /* Nút chọn Hành động (Encrypt / Decrypt) */
+    .action-btn {
+      flex: 1; padding: 9px; border-radius: 8px; border: 1px solid #1e3a5f; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 600; transition: all 0.2s;
+      background: transparent; color: #475569;
+    }
+    .action-btn.active { border-color: #38bdf8; background: rgba(56,189,248,0.12); color: #38bdf8; }
+
+    /* Nút Xử lý */
+    .submit-btn {
+      width: 100%; padding: 14px; border-radius: 10px; border: none; font-family: inherit;
+      font-weight: 900; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; transition: all 0.2s;
+    }
+    .submit-btn.active { background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%); color: #fff; box-shadow: 0 8px 25px rgba(14,165,233,0.35); cursor: pointer; }
+    .submit-btn.disabled { background: rgba(30,41,59,0.5); color: #334155; box-shadow: none; }
+    .submit-btn.animating { opacity: 0.7; }
+  </style>
+</head>
+<body>
+
+  <div style="position: fixed; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(14,165,233,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(14,165,233,0.04) 1px, transparent 1px); background-size: 40px 40px;"></div>
+
+  <div style="width: 100%; max-width: 680px; position: relative; z-index: 1;">
+    
+    <div style="text-align: center; margin-bottom: 32px;">
+      <div style="font-size: 11px; letter-spacing: 6px; color: #38bdf8; margin-bottom: 8px; text-transform: uppercase;">
+        Số học đồng dư • Mã hóa thông tin
+      </div>
+      <h1 style="font-size: 36px; font-weight: 900; margin: 0; background: linear-gradient(135deg, #e2e8f0 0%, #38bdf8 50%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px;">
+        CIPHER TOOL
+      </h1>
+      <div style="color: #475569; font-size: 12px; margin-top: 6px; letter-spacing: 2px;">
+        CLASSICAL CRYPTOGRAPHY • MOD 26
+      </div>
+    </div>
+
+    <div style="background: rgba(15,23,42,0.85); border: 1px solid #1e3a5f; border-radius: 16px; padding: 28px; box-shadow: 0 0 60px rgba(56,189,248,0.08), 0 25px 50px rgba(0,0,0,0.5); backdrop-filter: blur(12px);">
+      
+      <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+        <button id="tab-caesar" class="mode-btn active" onclick="setMode('caesar')">Caesar Cipher</button>
+        <button id="tab-vigenere" class="mode-btn" onclick="setMode('vigenere')">Vigenère Cipher</button>
+      </div>
+
+      <div id="formula-badge" style="background: rgba(56,189,248,0.07); border: 1px solid rgba(56,189,248,0.2); border-radius: 8px; padding: 8px 16px; margin-bottom: 20px; text-align: center; font-size: 15px; color: #7dd3fc; font-weight: 700; letter-spacing: 1px;">
+        C ≡ (P + 3) mod 26
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <button id="act-encrypt" class="action-btn active" onclick="setAction('encrypt')">🔐 Mã hóa</button>
+        <button id="act-decrypt" class="action-btn" onclick="setAction('decrypt')">🔓 Giải mã</button>
+      </div>
+
+      <div style="margin-bottom: 18px;">
+        
+        <div id="caesar-key-wrap">
+          <label style="display: block; color: #64748b; font-size: 11px; letter-spacing: 2px; margin-bottom: 6px;">KHÓA K (0–25)</label>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <input id="input-k" type="range" min="0" max="25" value="3" oninput="updateK(this.value)" style="flex: 1; accent-color: #38bdf8; cursor: pointer;" />
+            <div id="display-k" style="min-width: 48px; text-align: center; font-weight: 900; font-size: 22px; color: #38bdf8; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 4px 8px;">3</div>
+          </div>
+        </div>
+
+        <div id="vigenere-key-wrap" style="display: none;">
+          <label style="display: block; color: #64748b; font-size: 11px; letter-spacing: 2px; margin-bottom: 6px;">TỪ KHÓA (chữ cái)</label>
+          <input id="input-vkey" type="text" value="KEY" oninput="this.value = this.value.toUpperCase(); updateUI();" placeholder="Nhập từ khóa..." style="width: 100%; padding: 10px 14px; border-radius: 8px; box-sizing: border-box; background: rgba(15,23,42,0.9); border: 1px solid #1e3a5f; color: #38bdf8; font-family: inherit; font-size: 15px; font-weight: 700; outline: none; letter-spacing: 4px;" onfocus="this.style.borderColor='#38bdf8'" onblur="this.style.borderColor='#1e3a5f'" />
+        </div>
+
+      </div>
+
+      <div style="margin-bottom: 18px;">
+        <label style="display: block; color: #64748b; font-size: 11px; letter-spacing: 2px; margin-bottom: 6px;">VĂN BẢN ĐẦU VÀO</label>
+        <textarea id="input-text" rows="3" placeholder="Nhập văn bản cần xử lý..." oninput="updateUI()" style="width: 100%; padding: 12px 14px; border-radius: 8px; box-sizing: border-box; background: rgba(15,23,42,0.9); border: 1px solid #1e3a5f; color: #e2e8f0; font-family: inherit; font-size: 14px; outline: none; resize: vertical; line-height: 1.6;" onfocus="this.style.borderColor='#38bdf8'" onblur="this.style.borderColor='#1e3a5f'"></textarea>
+      </div>
+
+      <button id="btn-submit" class="submit-btn disabled" disabled onclick="handleProcess()">🔐 Mã hóa ngay</button>
+
+      <div id="output-wrap" style="display: none; margin-top: 20px; background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 16px; animation: fadeIn 0.4s ease;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="color: #64748b; font-size: 11px; letter-spacing: 2px;">KẾT QUẢ</span>
+          <button id="btn-copy" onclick="handleCopy()" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; padding: 4px 12px; cursor: pointer; color: #38bdf8; font-size: 11px; font-family: inherit; letter-spacing: 1px; transition: 0.2s;">
+            ⎘ Sao chép
+          </button>
+        </div>
+        <div id="output-text" style="color: #7dd3fc; font-size: 15px; font-weight: 700; word-break: break-all; line-height: 1.7; letter-spacing: 1px;"></div>
+      </div>
+
+      <div id="char-map-wrap" style="margin-top: 20px;">
+        <div id="char-map-title" style="color: #475569; font-size: 11px; letter-spacing: 2px; margin-bottom: 4px;">BẢNG ÁNH XẠ KÝ TỰ (K = 3)</div>
+        <div id="char-map-container" style="overflow-x: auto; margin-top: 8px;"></div>
+      </div>
+
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
+      <div style="background: rgba(15,23,42,0.6); border: 1px solid #1e293b; border-radius: 10px; padding: 14px 16px;">
+        <div style="color: #38bdf8; font-weight: 700; font-size: 12px; letter-spacing: 1px; margin-bottom: 6px;">Caesar Cipher</div>
+        <div style="color: #475569; font-size: 12px; line-height: 1.6;">Dịch chuyển mỗi ký tự đi k vị trí trong bảng chữ cái. Đây là mã hóa đồng dư đơn giản nhất: C ≡ (P+k) mod 26.</div>
+      </div>
+      <div style="background: rgba(15,23,42,0.6); border: 1px solid #1e293b; border-radius: 10px; padding: 14px 16px;">
+        <div style="color: #38bdf8; font-weight: 700; font-size: 12px; letter-spacing: 1px; margin-bottom: 6px;">Vigenère Cipher</div>
+        <div style="color: #475569; font-size: 12px; line-height: 1.6;">Dùng chuỗi khóa để mã hóa từng ký tự với độ dịch khác nhau. Mạnh hơn Caesar, chống tấn công tần số.</div>
+      </div>
+    </div>
+
+    <div style="text-align: center; color: #1e3a5f; font-size: 11px; margin-top: 20px; letter-spacing: 2px;">
+      SỐ HỌC ĐỒNG DƯ • Z₂₆ • MOD 26
+    </div>
+  </div>
+
+  <script>
+    // State
+    let state = { mode: 'caesar', action: 'encrypt', k: 3, vKey: 'KEY', input: '', output: '', animating: false };
+
+    // Initialize UI
+    updateCharMap();
+    updateUI();
+
+    function setMode(m) {
+      state.mode = m;
+      document.getElementById('tab-caesar').className = m === 'caesar' ? 'mode-btn active' : 'mode-btn';
+      document.getElementById('tab-vigenere').className = m === 'vigenere' ? 'mode-btn active' : 'mode-btn';
+      
+      document.getElementById('caesar-key-wrap').style.display = m === 'caesar' ? 'block' : 'none';
+      document.getElementById('vigenere-key-wrap').style.display = m === 'vigenere' ? 'block' : 'none';
+      document.getElementById('char-map-wrap').style.display = m === 'caesar' ? 'block' : 'none';
+      
+      clearOutput(); updateUI();
+    }
+
+    function setAction(a) {
+      state.action = a;
+      document.getElementById('act-encrypt').className = a === 'encrypt' ? 'action-btn active' : 'action-btn';
+      document.getElementById('act-decrypt').className = a === 'decrypt' ? 'action-btn active' : 'action-btn';
+      clearOutput(); updateUI();
+    }
+
+    function updateK(val) {
+      state.k = parseInt(val);
+      document.getElementById('display-k').innerText = state.k;
+      clearOutput(); updateUI(); updateCharMap();
+    }
+
+    function clearOutput() {
+      state.output = "";
+      document.getElementById('output-wrap').style.display = 'none';
+    }
+
+    function updateUI() {
+      state.input = document.getElementById('input-text').value;
+      state.vKey = document.getElementById('input-vkey').value;
+
+      // Update Formula
+      let formula = '';
+      if (state.mode === "caesar") {
+        formula = state.action === "encrypt" ? `C ≡ (P + ${state.k}) mod 26` : `P ≡ (C − ${state.k}) mod 26`;
+      } else {
+        formula = state.action === "encrypt" ? `Cᵢ ≡ (Pᵢ + Kᵢ) mod 26` : `Pᵢ ≡ (Cᵢ − Kᵢ) mod 26`;
+      }
+      document.getElementById('formula-badge').innerText = formula;
+
+      // Update Submit Button State
+      const btn = document.getElementById('btn-submit');
+      if (state.animating) {
+        btn.innerText = "⚙ Đang xử lý...";
+        btn.className = "submit-btn active animating";
+        btn.disabled = true;
+      } else {
+        btn.innerText = state.action === "encrypt" ? "🔐 Mã hóa ngay" : "🔓 Giải mã ngay";
+        if (state.input.trim() !== '') {
+          btn.className = "submit-btn active";
+          btn.disabled = false;
+        } else {
+          btn.className = "submit-btn disabled";
+          btn.disabled = true;
+        }
+      }
+    }
+
+    function updateCharMap() {
+      document.getElementById('char-map-title').innerText = `BẢNG ÁNH XẠ KÝ TỰ (K = ${state.k})`;
+      const letters = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+      
+      let html = `<table style="border-collapse: collapse; font-size: 11px; width: 100%;"><tbody><tr>`;
+      // Hàng 1: Chữ gốc
+      letters.forEach(l => {
+        html += `<td style="padding: 3px 5px; text-align: center; color: #94a3b8; font-family: monospace; border-bottom: 1px solid #1e293b;">${l}</td>`;
+      });
+      html += `</tr><tr>`;
+      // Hàng 2: Chữ mã hóa (theo mod 26)
+      letters.forEach((l, i) => {
+        const encCode = (((i + state.k) % 26) + 26) % 26; 
+        const enc = String.fromCharCode(encCode + 65);
+        html += `<td style="padding: 3px 5px; text-align: center; color: #38bdf8; font-family: monospace; font-weight: 700;">${enc}</td>`;
+      });
+      html += `</tr></tbody></table>`;
+      
+      document.getElementById('char-map-container').innerHTML = html;
+    }
+
+    function modValue(n, m) {
+      return ((n % m) + m) % m;
+    }
+
+    function caesarProcess(text, k, action) {
+      const shift = action === "encrypt" ? k : -k;
+      let result = "";
+
+      for (const ch of text) {
+        const code = ch.charCodeAt(0);
+
+        if (code >= 65 && code <= 90) {
+          result += String.fromCharCode(modValue(code - 65 + shift, 26) + 65);
+        } else if (code >= 97 && code <= 122) {
+          result += String.fromCharCode(modValue(code - 97 + shift, 26) + 97);
+        } else {
+          result += ch;
+        }
+      }
+
+      return result;
+    }
+
+    function vigenereProcess(text, key, action) {
+      const cleanKey = key.toLowerCase().replace(/[^a-z]/g, "");
+      if (!cleanKey) return text;
+
+      let result = "";
+      let keyIndex = 0;
+
+      for (const ch of text) {
+        const code = ch.charCodeAt(0);
+        const isUpper = code >= 65 && code <= 90;
+        const isLower = code >= 97 && code <= 122;
+
+        if (isUpper || isLower) {
+          const shiftValue = cleanKey.charCodeAt(keyIndex % cleanKey.length) - 97;
+          const shift = action === "encrypt" ? shiftValue : -shiftValue;
+          const base = isUpper ? 65 : 97;
+
+          result += String.fromCharCode(modValue(code - base + shift, 26) + base);
+          keyIndex += 1;
+        } else {
+          result += ch;
+        }
+      }
+
+      return result;
+    }
+
+    function processCipher() {
+      if (state.mode === "caesar") {
+        return caesarProcess(state.input, state.k, state.action);
+      }
+
+      return vigenereProcess(state.input, state.vKey, state.action);
+    }
+
+    async function handleProcess() {
+      state.animating = true;
+      updateUI();
+
+      // Giả lập delay 350ms như React để UI mượt hơn
+      setTimeout(async () => {
+        try {
+          state.output = processCipher();
+
+          document.getElementById('output-text').innerText = state.output;
+          document.getElementById('output-wrap').style.display = 'block';
+
+        } catch (err) {
+          alert("Lỗi xử lý dữ liệu. Vui lòng thử lại.");
+        } finally {
+          state.animating = false;
+          updateUI();
+        }
+      }, 350);
+    }
+
+    function handleCopy() {
+      if (!state.output) return;
+      navigator.clipboard.writeText(state.output);
+      
+      const btn = document.getElementById('btn-copy');
+      btn.innerText = "✓ Đã sao chép";
+      btn.style.color = "#4ade80";
+      
+      setTimeout(() => {
+        btn.innerText = "⎘ Sao chép";
+        btn.style.color = "#38bdf8";
+      }, 1500);
+    }
+  </script>
+</body>
+</html>
